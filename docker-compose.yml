@@ -1,0 +1,36 @@
+version: '3'
+
+services:
+
+  app:
+    container_name: album_manager
+    build: .
+    ports:
+      - 8080:8080
+    restart: on-failure
+  #  environment:
+  #    PORT: 8080
+  #    DB_CONN: "postgres://user:password@db:5432/db?sslmode=disable"
+    volumes:
+      - .:/album_manager
+    networks:
+      - album_network
+    depends_on:
+      - mongodb
+    links:
+      - mongodb
+
+  mongodb:
+    image: mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - "mongodata:/data/db"
+    networks:
+      - album_network
+
+volumes:
+   mongodata:
+
+networks:
+   album_network:
