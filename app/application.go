@@ -19,6 +19,8 @@ func StartApplication() {
 	atHandler := handler.NewHandler(atService)
 	// router.GET("/oauth/access_token/:access_token_id", atHandler.GetByID)
 	router.POST("/insertImageInAlbum/:album_id", atHandler.InsertImageInAlbum)
-	router.Run(":8080")
+	router.POST("/createAlbum", atHandler.CreateAlbum)
+	router.DELETE("/deleteAlbum", atHandler.DeleteAlbum)
+	router.Run(":8000")
 
 }

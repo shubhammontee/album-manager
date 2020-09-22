@@ -4,17 +4,21 @@ import (
 	"album-manager/album-manager/datasource/mongodb"
 	"album-manager/album-manager/models"
 	"album-manager/album-manager/utils/errors"
+	"context"
 	"fmt"
+	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 var (
-	collection *mongo.Collection
+	database *mongo.Database
 )
 
 type AlbumDaoInterface interface {
-	InsertImageInAlbum(user *models.User) *errors.RestErr
+	InsertImageInAlbum(user *models.Image) *errors.RestErr
+	CreateAlbum(album *models.Album) *errors.RestErr
+	DeleteAlbum(album string) *errors.RestErr
 }
 
 type albumDao struct {
@@ -26,11 +30,35 @@ func NewDao() AlbumDaoInterface {
 
 }
 func init() {
-	collection = mongodb.GetMongoInstance().Database("usersdb").Collection("users")
+	database = mongodb.GetMongoInstance().Database("album_manager")
+	//collection = mongodb.GetMongoInstance().Database("usersdb").Collection("users")
+}
+
+func (ad albumDao) CreateAlbum(album *models.Album) *errors.RestErr {
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err := database.CreateCollection(ctx, album.Email+"-"+album.AlbumName)
+	if err != nil {
+		return errors.NewInternalServerError(err.Error())
+	}
+	collection := mongodb.GetMongoInstance().Database("album_manager").Collection("albums_list")
+	_, err = collection.InsertOne(ctx, album)
+	if err != nil {
+		return errors.NewInternalServerError(err.Error())
+	}
+	return nil
+}
+
+func (ad albumDao) DeleteAlbum(album string) *errors.RestErr {
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err := database.Collection(album).Drop(ctx)
+	if err != nil {
+		return errors.NewInternalServerError(err.Error())
+	}
+	return nil
 }
 
 //Insert user ingto the database
-func (ad albumDao) InsertImageInAlbum(user *models.User) *errors.RestErr {
+func (ad albumDao) InsertImageInAlbum(user *models.Image) *errors.RestErr {
 	fmt.Println("implement dao")
 	// ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
 	// _, err := collection.InsertOne(ctx, user)
