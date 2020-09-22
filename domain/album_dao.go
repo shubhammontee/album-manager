@@ -6,9 +6,14 @@ import (
 	"album-manager/album-manager/utils/errors"
 	"context"
 	"fmt"
+	"log"
+	"os"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/gridfs"
 )
 
 var (
@@ -16,9 +21,9 @@ var (
 )
 
 type AlbumDaoInterface interface {
-	InsertImageInAlbum(user *models.Image) *errors.RestErr
+	InsertImageInAlbum(image *models.Image) *errors.RestErr
 	CreateAlbum(album *models.Album) *errors.RestErr
-	DeleteAlbum(album string) *errors.RestErr
+	DeleteAlbum(album *models.Album) *errors.RestErr
 }
 
 type albumDao struct {
@@ -48,9 +53,22 @@ func (ad albumDao) CreateAlbum(album *models.Album) *errors.RestErr {
 	return nil
 }
 
-func (ad albumDao) DeleteAlbum(album string) *errors.RestErr {
+func (ad albumDao) DeleteAlbum(album *models.Album) *errors.RestErr {
 	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	err := database.Collection(album).Drop(ctx)
+	collection := database.Collection("albums_list")
+	filter := bson.D{{"_id", album.ID}}
+	err := collection.FindOne(ctx, filter).Decode(&album)
+	if err != nil {
+		fmt.Println(err)
+		return errors.NewInternalServerError(err.Error())
+	}
+	_, err = collection.DeleteOne(ctx, filter)
+	if err != nil {
+		fmt.Println(err)
+		return errors.NewInternalServerError(err.Error())
+	}
+	//	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	err = database.Collection(album.Email + "-" + album.AlbumName).Drop(ctx)
 	if err != nil {
 		return errors.NewInternalServerError(err.Error())
 	}
@@ -58,15 +76,53 @@ func (ad albumDao) DeleteAlbum(album string) *errors.RestErr {
 }
 
 //Insert user ingto the database
-func (ad albumDao) InsertImageInAlbum(user *models.Image) *errors.RestErr {
-	fmt.Println("implement dao")
-	// ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	// _, err := collection.InsertOne(ctx, user)
-	// if err != nil {
-	// 	return errors.NewInternalServerError(err.Error())
-	// }
-	// id := fmt.Sprintf("%v", res.InsertedID)
-	// user.ID = id[10 : len(id)-2]
+func (ad albumDao) InsertImageInAlbum(image *models.Image) *errors.RestErr {
+	bucket, err := gridfs.NewBucket(
+		mongodb.GetMongoInstance().Database("Images"),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	uploadStream, err := bucket.OpenUploadStream(
+		image.ImageName, // this is the name of the file which will be saved in the database
+	)
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer uploadStream.Close()
+
+	fileSize, err := uploadStream.Write(image.ImageData)
+	if err != nil {
+		log.Fatal(err)
+		os.Exit(1)
+	}
+	fmt.Println(uploadStream.FileID)
+	log.Printf("Write file to DB was successful. File size: %d \n", fileSize)
+
+	var album models.Album
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+	collection := database.Collection("albums_list")
+	id, err := primitive.ObjectIDFromHex(image.AlbumId)
+	filter := bson.D{{"_id", id}}
+	if err := collection.FindOne(ctx, filter).Decode(&album); err != nil {
+		fmt.Println(err)
+		return errors.NewInternalServerError(err.Error())
+	}
+	fmt.Println("album")
+
+	fmt.Println(uploadStream.FileID)
+	image.FileId = uploadStream.FileID.(primitive.ObjectID).Hex()
+	image.ImageData = nil
+	fmt.Println("image")
+
+	fmt.Println(image)
+	collection = database.Collection(album.Email + "-" + album.AlbumName)
+	_, err = collection.InsertOne(ctx, image)
+	if err != nil {
+		return errors.NewInternalServerError(err.Error())
+	}
+
 	return nil
 }
 
