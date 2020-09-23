@@ -24,6 +24,7 @@ type AlbumDaoInterface interface {
 	InsertImageInAlbum(image *models.Image) *errors.RestErr
 	CreateAlbum(album *models.Album) *errors.RestErr
 	DeleteAlbum(album *models.Album) *errors.RestErr
+	DeleteImage(image *models.Image) *errors.RestErr
 }
 
 type albumDao struct {
@@ -75,6 +76,51 @@ func (ad albumDao) DeleteAlbum(album *models.Album) *errors.RestErr {
 	return nil
 }
 
+func (ad albumDao) DeleteImage(image *models.Image) *errors.RestErr {
+	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
+
+	var album models.Album
+	collection := database.Collection("albums_list")
+	id, err := primitive.ObjectIDFromHex(image.AlbumId)
+	filter := bson.D{{"_id", id}}
+	if err != nil {
+		return errors.NewInternalServerError(err.Error())
+	}
+	err = collection.FindOne(ctx, filter).Decode(&album)
+	if err != nil {
+		fmt.Println(err)
+		return errors.NewInternalServerError(err.Error())
+	}
+
+	fltr := bson.D{{"_id", image.ID}}
+	collection = database.Collection(album.Email + "-" + album.AlbumName)
+	collection.FindOne(ctx, fltr).Decode(&image)
+	bucket, err := gridfs.NewBucket(
+		mongodb.GetMongoInstance().Database("Images"),
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fileId, err := primitive.ObjectIDFromHex(image.FileId)
+	if err != nil {
+		return errors.NewInternalServerError(err.Error())
+
+	}
+	fmt.Println("***********")
+	fmt.Println(fileId)
+	err = bucket.Delete(fileId)
+	if err != nil {
+		return errors.NewInternalServerError(err.Error())
+
+	}
+	_, err = collection.DeleteOne(ctx, fltr)
+	if err != nil {
+		fmt.Println(err)
+		return errors.NewInternalServerError(err.Error())
+	}
+	return nil
+}
+
 //Insert user ingto the database
 func (ad albumDao) InsertImageInAlbum(image *models.Image) *errors.RestErr {
 	bucket, err := gridfs.NewBucket(
@@ -97,7 +143,7 @@ func (ad albumDao) InsertImageInAlbum(image *models.Image) *errors.RestErr {
 		log.Fatal(err)
 		os.Exit(1)
 	}
-	fmt.Println(uploadStream.FileID)
+
 	log.Printf("Write file to DB was successful. File size: %d \n", fileSize)
 
 	var album models.Album
@@ -109,14 +155,10 @@ func (ad albumDao) InsertImageInAlbum(image *models.Image) *errors.RestErr {
 		fmt.Println(err)
 		return errors.NewInternalServerError(err.Error())
 	}
-	fmt.Println("album")
-
-	fmt.Println(uploadStream.FileID)
 	image.FileId = uploadStream.FileID.(primitive.ObjectID).Hex()
-	image.ImageData = nil
-	fmt.Println("image")
 
-	fmt.Println(image)
+	image.ImageData = nil
+
 	collection = database.Collection(album.Email + "-" + album.AlbumName)
 	_, err = collection.InsertOne(ctx, image)
 	if err != nil {
