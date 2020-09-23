@@ -106,8 +106,6 @@ func (ad albumDao) DeleteImage(image *models.Image) *errors.RestErr {
 		return errors.NewInternalServerError(err.Error())
 
 	}
-	fmt.Println("***********")
-	fmt.Println(fileId)
 	err = bucket.Delete(fileId)
 	if err != nil {
 		return errors.NewInternalServerError(err.Error())
