@@ -18,9 +18,10 @@ func StartApplication() {
 	atService := service.NewService(dbRepository)
 	atHandler := handler.NewHandler(atService)
 	// router.GET("/oauth/access_token/:access_token_id", atHandler.GetByID)
-	router.POST("/insertImageInAlbum/:album_id", atHandler.InsertImageInAlbum)
+	router.POST("/insertImageInAlbum", atHandler.InsertImageInAlbum)
 	router.POST("/createAlbum", atHandler.CreateAlbum)
-	router.DELETE("/deleteAlbum", atHandler.DeleteAlbum)
+	router.DELETE("/deleteAlbum/:album_id", atHandler.DeleteAlbum)
+	router.DELETE("/deleteImage", atHandler.DeleteImage)
 	router.Run(":8000")
 
 }
