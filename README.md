@@ -11,6 +11,17 @@ Steps to launch the whole application
 
 3. docker-compose -f .\docker-compose.yml up -d
 
+** we might need to create the topic for kafka manually here follow the below two steps
+
+1. docker exec -it kafka /bin/sh  
+
+check if image_notification topic is present or not 
+./kafka-topics.sh --list --zookeeper zookeeper:2181 
+
+if not present run
+2. ./kafka-topics.sh --create --zookeeper zookeeper:2181  --replication-factor 1 --partitions 1 --topic image_notification
+
+
 
 
        FOR NOTIFICATION SERVICE
