@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	connectionString = "mongodb://localhost:27017"
+	connectionString = "mongodb://host.docker.internal:27017"
 )
 
 var (

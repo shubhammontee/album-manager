@@ -29,6 +29,8 @@ COPY . .
 # Note here: CGO_ENABLED is disabled for cross system compilation
 # It is also a common best practise.
 
+
+
 # Build the application.
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ./bin/main .
 
